@@ -1,0 +1,7 @@
+# Exclude workspace files
+.lsp/
+.cpcache/
+.clj-kondo/
+
+# Do not include rendered notebooks
+docs/
