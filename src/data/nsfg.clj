@@ -6,11 +6,11 @@
   (:import java.util.zip.GZIPInputStream))
 
 
-(def dict-line-rx #"^\s+_column\((\d+)\)\s+(\S+)\s+(\S+)\s+%(\d+)(\S)\s+\"([^\"]+)\"")
+(def dict-line-regex #"^\s+_column\((\d+)\)\s+(\S+)\s+(\S+)\s+%(\d+)(\S)\s+\"([^\"]+)\"")
 
 (defn parse-dict-line
   [line]
-  (let [[_ col type name f-len f-spec descr] (re-find dict-line-rx line)]
+  (let [[_ col type name f-len f-spec descr] (re-find dict-line-regex line)]
     {:col    (dec (Integer/parseInt col))
      :type   type
      :name   (str/replace name "_" "-")
@@ -18,7 +18,7 @@
      :f-spec f-spec
      :descr  descr}))
 
-(defn read-dict-defn
+(defn read-dictionary
   "Read a Stata dictionary file, return a vector of column definitions."
   [path]
   (with-open [r (io/reader path)]
@@ -26,7 +26,7 @@
 
 (defn parse-value
   [type raw-value]
-  (when (not (empty? raw-value))
+  (when (seq raw-value)
     (case type
       ("str12")          raw-value
       ("byte" "int")     (Long/parseLong raw-value)
@@ -37,7 +37,7 @@
    Return a vector of columns."
   [dict]
   (fn [row]
-    (reduce (fn [accum {:keys [col type name f-len]}]
+    (reduce (fn [accum {:keys [col type f-len]}]
               (let [raw-value (str/trim (subs row col (+ col f-len)))]
                 (conj accum (parse-value type raw-value))))
             []
@@ -50,29 +50,77 @@
     (io/reader (GZIPInputStream. (io/input-stream path)))
     (io/reader path)))
 
-(defn read-dct-data
+(defn read-dictionary-data
   "Parse lines from `rdr` according to the specification in `dict`.
    Return a lazy sequence of parsed rows."
   [dict rdr]
   (let [parse-fn (make-row-parser dict)]
     (map parse-fn (line-seq rdr))))
 
-(defn as-dataset
+(defn in?
+  "true if coll contains elm"
+  [coll elm]
+  (some #(= elm %) coll))
+
+(defn clean-fem-preg
+  " Recodes variables from the pregnancy frame.
+
+    # mother's age is encoded in centiyears; convert to years
+    df.agepreg /= 100.0
+
+    # birthwgt_lb contains at least one bogus value (51 lbs)
+    # replace with NaN
+    df.loc[df.birthwgt_lb1 > 20, 'birthwgt_lb1'] = np.nan
+
+    # replace 'not ascertained', 'refused', 'don't know' with NaN
+    na_vals = [97, 98, 99]
+    df.birthwgt_lb1.replace(na_vals, np.nan, inplace=True)
+    df.birthwgt_oz1.replace(na_vals, np.nan, inplace=True)
+
+    # birthweight is stored in two columns, lbs and oz.
+    # convert to a single column in lb
+    # NOTE: creating a new column requires dictionary syntax,
+    # not attribute assignment (like df.totalwgt_lb)
+    df['totalwgt_lb'] = df.birthwgt_lb1 + df.birthwgt_oz1 / 16.0"
+  [ds]
+  (-> ds
+      (tc/map-rows (fn [{:keys [agepreg]}]
+                     {:agepreg (when-not (nil? agepreg)
+                                 (float (/ agepreg 100)))}))
+      (tc/map-rows (fn [{:keys [birthwgt-lb]}]
+                     (let [na-vals [51 97 98 99]]
+                       {:birthwgt-lb (if (in? na-vals birthwgt-lb)
+                                       nil
+                                       birthwgt-lb)})))
+      (tc/map-rows (fn [{:keys [birthwgt-oz]}]
+                     (let [na-vals [97 98 99]]
+                       {:birthwgt-oz (if (in? na-vals birthwgt-oz)
+                                       nil
+                                       birthwgt-oz)})))
+      (tc/map-rows (fn [{:keys [birthwgt-lb birthwgt-oz]}]
+                     {:totalwgt-lb (when (and birthwgt-lb birthwgt-oz)
+                                     (-> (/ birthwgt-oz 16)
+                                         float
+                                         (+ birthwgt-lb)))}))))
+
+(defn read-fem-preg-dataset
   "Read Stata data set, return an dataset."
   [dict-path data-path]
-  (let [dict   (read-dict-defn dict-path)
+  (let [dict-path (or dict-path "resources/2002FemPreg.dct")
+        data-path (or data-path "resources/2002FemPreg.dat.gz")
+        dict   (read-dictionary dict-path)
         header (map (comp keyword :name) dict)]
     (with-open [r (reader data-path)]
-      (tc/dataset (read-dct-data dict r)
-                   {:layout :as-rows
-                    :column-names header
-                    :dataset-name "2002FemPreg"}))))
+      (->> (tc/dataset (read-dictionary-data dict r)
+                       {:layout :as-rows
+                        :column-names header
+                        :dataset-name "2002FemPreg"})
+           (clean-fem-preg)))))
 
 (defn get-column-frequency-by-index [ds col index]
   (-> (tc/column ds col)
       frequencies
-      (get index)
-      ))
+      (get index)))
 
 (defn get-column-max-by-value [ds col]
   (let [freq (-> (tc/column ds col) frequencies)
@@ -98,7 +146,7 @@
     key = max(weights.keys())
     assert df.finalwgt.value_counts()[key] == 6"
   []
-  (let [ds (as-dataset "resources/2002FemPreg.dct" "resources/2002FemPreg.dat.gz")]
+  (let [ds (read-fem-preg-dataset "resources/2002FemPreg.dct" "resources/2002FemPreg.dat.gz")]
     (try
       (assert (= (tc/row-count ds) 13593)  "Numbers of rows should be 13593")
       (assert (= (tc/get-entry ds :caseid 13592) "12571")  "The caseid entry with inder 13592 should be 12571")
@@ -110,15 +158,9 @@
       (assert (= (get-column-frequency-by-index ds :prglngth 39) 4744) "The number of entries with value 39 in :prglngth column should be 4744")
       (assert (= (get-column-frequency-by-index ds :outcome 1) 9148) "The number of entries with value 1 in :outcome column should be 9148")
       (assert (= (get-column-frequency-by-index ds :birthord 1) 4413) "The number of entries with value 1 in :birthord column should be 4413")
-      ;; (assert (= (get-column-frequency-by-index ds :agepreg 22.75) 100) "The number of entries with value 22.75 in :agepreg column should be 100")
-      ;; (assert (= (get-column-frequency-by-index ds :totalwgt-lb 7.5) 302) "The number of entries with value 7.5 in :totalwgt-lb column should be 302")
+      (assert (= (get-column-frequency-by-index ds :agepreg 22.75) 100) "The number of entries with value 22.75 in :agepreg column should be 100")
+      (assert (= (get-column-frequency-by-index ds :totalwgt-lb 7.5) 302) "The number of entries with value 7.5 in :totalwgt-lb column should be 302")
       (assert (= (get-column-max-by-value ds :finalwgt) 6) "The value of the max entry in :finalwgt column should be 6")
 
-      (catch AssertionError e "Assert data failed" (.getMessage e)))))
-
-(comment
-  (-> (as-dataset "resources/2002FemPreg.dct" "resources/2002FemPreg.dat.gz")
-      (tc/column :caseid))
-
-;;
-  )
+      (catch AssertionError e "Assert data failed" (.getMessage e)))
+    (prn "All tests passed.")))
