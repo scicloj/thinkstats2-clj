@@ -5,7 +5,6 @@
             [tablecloth.api :as tc])
   (:import java.util.zip.GZIPInputStream))
 
-
 (def dict-line-regex #"^\s+_column\((\d+)\)\s+(\S+)\s+(\S+)\s+%(\d+)(\S)\s+\"([^\"]+)\"")
 
 (defn parse-dict-line
@@ -105,17 +104,17 @@
 
 (defn read-fem-preg-dataset
   "Read Stata data set, return an dataset."
-  [dict-path data-path]
-  (let [dict-path (or dict-path "resources/2002FemPreg.dct")
-        data-path (or data-path "resources/2002FemPreg.dat.gz")
-        dict   (read-dictionary dict-path)
-        header (map (comp keyword :name) dict)]
-    (with-open [r (reader data-path)]
-      (->> (tc/dataset (read-dictionary-data dict r)
-                       {:layout :as-rows
-                        :column-names header
-                        :dataset-name "2002FemPreg"})
-           (clean-fem-preg)))))
+  ([]
+   (read-fem-preg-dataset "resources/2002FemPreg.dct" "resources/2002FemPreg.dat.gz"))
+  ([dict-path data-path]
+   (let [dict   (read-dictionary dict-path)
+         header (map (comp keyword :name) dict)]
+     (with-open [r (reader data-path)]
+       (->> (tc/dataset (read-dictionary-data dict r)
+                        {:layout :as-rows
+                         :column-names header
+                         :dataset-name "2002FemPreg"})
+            (clean-fem-preg))))))
 
 (defn get-column-frequency-by-index [ds col index]
   (-> (tc/column ds col)
