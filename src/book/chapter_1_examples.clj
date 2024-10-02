@@ -130,8 +130,49 @@
 ;;`read-dictionary` takes the name of the dictionary file and returns dict, a vector that contains the column information from the dictionary file.
 ;;`read-dictionary-data` reads the data file using the dictionary.
 ;;
+;;## 1.4 DataFrames
 ;;
+;;The result of `tc/dataset` is a dataset (data frame), which is the columnar data structure provided by tablecloth, which is a Clojure data library we’ll use throughout this book.
+;;A DataFrame contains a row for each record, in this case one row per pregnancy, and a column for each variable.
 ;;
+;;In addition to the data, a DataFrame also contains the variable names and their types, and it provides methods for accessing and modifying the data.
+;;If you print df you get a truncated view of the rows and columns, and the shape of the DataFrame, which is 13593 rows/records and 244 columns/variables.
+;;```
+;;user> (require '[data.nsfg :as nsfg])
+;;user> (nsfg/read-fem-preg-dataset)
+;; => 2002FemPreg [13593 244]:
+;;...
+;;```
+;;The DataFrame is too big to display, so the output is truncated. The first line reports the number of rows and columns.
 ;;
+;;The column-names function returns a sequence of column names (`read-fem-preg-dataset` function converts strings to keywords, so here we have a sequence of keywords):
+;;```
+;;user> (require '[tablecloth.api :as tc])
+;;user> (tc/column-names (nsfg/read-fem-preg-dataset))
+;;=> (:caseid :pregordr :howpreg-n :howpreg-p :moscurrp ...)
+;;```
 ;;
+;;To access a column from a DataFrame, you can use the column name as a key (you can also use `tc/column` function):
+;;```
+;;user> ((nsfg/read-fem-preg-dataset) :pregordr)
+;; => #tech.v3.dataset.column<int64>[13593]
+;; :pregordr
+;; [1, 2, 1, 2, 3, 1, 2, 3, 1, 2, 1, 1, 2, 3, 1, 2, 3, 1, 2, 1...]
+;;````
+;;The result is a Column, yet another tablecloth data structure. A Column is like a Clojure vector.
+;;When you print a Column, you get its values.
+;;The first two lines includes the values type, the number of rows and the column name. Here elements are integers (int64), but they can be any type.
+;;If you run this example on a 32-bit machine you might see int32
+;;You can access the elements of a Column using integer indexes or sub sequences:
+;;
+;;```
+;;user> (-> (tc/column (nsfg/read-fem-preg-dataset) :pregordr)
+;;           (get 0))
+;;=> 1
+;;
+;;user> (->> (tc/column (nsfg/read-fem-preg-dataset) :pregordr)
+;;            (take 5)
+;;            (drop 2))
+;;=> (1 2 3)
+;;```
 ;;
