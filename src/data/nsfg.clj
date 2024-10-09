@@ -121,6 +121,8 @@
                          :dataset-name "2002FemPreg"})
             (clean-fem-preg))))))
 
+(def read-fem-preg-dataset (memoize read-fem-preg-dataset)) ;;  cache results of reading the ds to speed up rendering. TODO: Remove
+
 (defn get-column-frequency-by-index [ds col index]
   (-> (tc/column ds col)
       frequencies
