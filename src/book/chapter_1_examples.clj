@@ -160,6 +160,25 @@
      (take 5)
      (drop 2))
 ;;
+;; ## 1.5 Variables
+;;We have already seen two variables in the NSFG dataset, `caseid` and `pregordr`, and we have seen that there are 244 variables in total. For the explorations in this book, I use the
+;;following variables:
 ;;
+;;* `caseid` is the integer ID of the respondent.
+;;* `prglngth` is the integer duration of the pregnancy in weeks.
+;;* `outcome` is an integer code for the outcome of the pregnancy. The code 1 indicates a live birth.
+;;* `pregordr` is a pregnancy serial number; for example, the code for a respondent’s first pregnancy is 1, for the second pregnancy is 2, and so on.
+;;* `birthord` is a serial number for live births; the code for a respondent’s first child is 1, and so on. For outcomes other than live birth, this field is blank.
+;;* `birthwgt_lb` and `birthwgt_oz` contain the pounds and ounces parts of the birth weight of the baby.
+;;* `agepreg` is the mother’s age at the end of the pregnancy.
+;;* `finalwgt` is the statistical weight associated with the respondent. It is a floating-point value that indicates the number of people in the U.S. population this respondent represents.
 ;;
+;;If you read the codebook carefully, you will see that many of the variables are **recodes**, which means that they are not part of the **raw data** collected by the survey; they are
+;;calculated using the raw data.
+;;
+;;For example, `prglngth` for live births is equal to the raw variable `wksgest` (weeks of gestation) if it is available; otherwise it is estimated using `mosgest * 4.33` (months of gestation
+;;times the average number of weeks in a month).
+;;
+;;Recodes are often based on logic that checks the consistency and accuracy of the data. In general it is a good idea to use recodes when they are available, unless there is a compelling reason
+;;to process the raw data yourself.
 ;;
