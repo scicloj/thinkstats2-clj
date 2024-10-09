@@ -2,7 +2,8 @@
   ^{:doc "Translation of python code to generate dataset used in ThinkStats2 book. Original source here: https://raw.githubusercontent.com/AllenDowney/ThinkStats2/master/code/nsfg.py"}
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
-            [tablecloth.api :as tc])
+            [tablecloth.api :as tc]
+            [tablecloth.column.api :as tcc])
   (:import java.util.zip.GZIPInputStream))
 
 (def dict-line-regex #"^\s+_column\((\d+)\)\s+(\S+)\s+(\S+)\s+%(\d+)(\S)\s+\"([^\"]+)\"")
@@ -83,24 +84,28 @@
     df['totalwgt_lb'] = df.birthwgt_lb1 + df.birthwgt_oz1 / 16.0"
   [ds]
   (-> ds
-      (tc/map-rows (fn [{:keys [agepreg]}]
-                     {:agepreg (when-not (nil? agepreg)
-                                 (float (/ agepreg 100)))}))
-      (tc/map-rows (fn [{:keys [birthwgt-lb]}]
-                     (let [na-vals [51 97 98 99]]
-                       {:birthwgt-lb (if (in? na-vals birthwgt-lb)
-                                       nil
-                                       birthwgt-lb)})))
-      (tc/map-rows (fn [{:keys [birthwgt-oz]}]
-                     (let [na-vals [97 98 99]]
-                       {:birthwgt-oz (if (in? na-vals birthwgt-oz)
-                                       nil
-                                       birthwgt-oz)})))
-      (tc/map-rows (fn [{:keys [birthwgt-lb birthwgt-oz]}]
-                     {:totalwgt-lb (when (and birthwgt-lb birthwgt-oz)
-                                     (-> (/ birthwgt-oz 16)
-                                         float
-                                         (+ birthwgt-lb)))}))))
+      (tc/map-columns :agepreg
+                      [:agepreg]
+                      (fn [v]
+                        (when-not (nil? v)
+                          (float (/ v 100)))))
+      (tc/map-columns :birthwgt-lb
+                      [:birthwgt-lb]
+                      (fn [v]
+                        (let [na-vals [51 97 98 99]]
+                          (if (in? na-vals v) nil v))))
+      (tc/map-columns :birthwgt-oz
+                      [:birthwgt-oz]
+                      (fn [v]
+                        (let [na-vals [97 98 99]]
+                          (if (in? na-vals v) nil v))))
+      (tc/map-columns :totalwgt-lb
+                      [:birthwgt-lb :birthwgt-oz]
+                      (fn [w-lb w-oz]
+                        (when (and w-lb w-oz)
+                          (-> (/ w-oz 16)
+                              float
+                              (+ w-lb)))))))
 
 (defn read-fem-preg-dataset
   "Read Stata data set, return an dataset."
@@ -122,9 +127,8 @@
       (get index)))
 
 (defn get-column-max-by-value [ds col]
-  (let [freq (-> (tc/column ds col) frequencies)
-        max-key (->> freq keys (apply max))]
-    (get freq max-key)))
+  (-> (ds col)
+      tcc/reduce-max))
 
 (defn assert-data
   "Check data after loading according to import script https://github.com/AllenDowney/ThinkStats2/blob/master/workshop/nsfg.py

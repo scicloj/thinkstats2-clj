@@ -137,42 +137,29 @@
 ;;
 ;;In addition to the data, a DataFrame also contains the variable names and their types, and it provides methods for accessing and modifying the data.
 ;;If you print df you get a truncated view of the rows and columns, and the shape of the DataFrame, which is 13593 rows/records and 244 columns/variables.
-;;```
-;;user> (require '[data.nsfg :as nsfg])
-;;user> (nsfg/read-fem-preg-dataset)
-;; => 2002FemPreg [13593 244]:
-;;...
-;;```
+(nsfg/read-fem-preg-dataset)
+;;
 ;;The DataFrame is too big to display, so the output is truncated. The first line reports the number of rows and columns.
 ;;
-;;The column-names function returns a sequence of column names (`read-fem-preg-dataset` function converts strings to keywords, so here we have a sequence of keywords):
-;;```
-;;user> (require '[tablecloth.api :as tc])
-;;user> (tc/column-names (nsfg/read-fem-preg-dataset))
-;;=> (:caseid :pregordr :howpreg-n :howpreg-p :moscurrp ...)
-;;```
-;;
+;;The `column-names` function (do not forget to import the namespace `[tablecloth.api :as tc]`) returns a sequence of column names (`read-fem-preg-dataset` function converts strings
+;;to keywords, so here we have a sequence of keywords):
+(->> (tc/column-names (nsfg/read-fem-preg-dataset))
+     (take 5))
 ;;To access a column from a DataFrame, you can use the column name as a key (you can also use `tc/column` function):
-;;```
-;;user> ((nsfg/read-fem-preg-dataset) :pregordr)
-;; => #tech.v3.dataset.column<int64>[13593]
-;; :pregordr
-;; [1, 2, 1, 2, 3, 1, 2, 3, 1, 2, 1, 1, 2, 3, 1, 2, 3, 1, 2, 1...]
-;;````
-;;The result is a Column, yet another tablecloth data structure. A Column is like a Clojure vector.
-;;When you print a Column, you get its values.
-;;The first two lines includes the values type, the number of rows and the column name. Here elements are integers (int64), but they can be any type.
-;;If you run this example on a 32-bit machine you might see int32
+((nsfg/read-fem-preg-dataset) :pregordr)
+;;The result is a `Column`, yet another tablecloth data structure. A `Column` is like a Clojure vector.
+;;When you print a `Column`, you get its values.
+;;The first two lines include the values type, the number of rows, and the column name. Here elements are integers (int64), but they can be any type.
+;;If you run this example on a 32-bit machine you might see int32.
 ;;You can access the elements of a Column using integer indexes or sub sequences:
 ;;
-;;```
-;;user> (-> (tc/column (nsfg/read-fem-preg-dataset) :pregordr)
-;;           (get 0))
-;;=> 1
+(-> (tc/column (nsfg/read-fem-preg-dataset) :pregordr)
+    (get 0))
+
+(->> (tc/column (nsfg/read-fem-preg-dataset) :pregordr)
+     (take 5)
+     (drop 2))
 ;;
-;;user> (->> (tc/column (nsfg/read-fem-preg-dataset) :pregordr)
-;;            (take 5)
-;;            (drop 2))
-;;=> (1 2 3)
-;;```
+;;
+;;
 ;;
