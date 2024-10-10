@@ -160,7 +160,7 @@
      (take 5)
      (drop 2))
 ;;
-;; ## 1.5 Variables
+;;## 1.5 Variables
 ;;We have already seen two variables in the NSFG dataset, `caseid` and `pregordr`, and we have seen that there are 244 variables in total. For the explorations in this book, I use the
 ;;following variables:
 ;;
@@ -181,4 +181,57 @@
 ;;
 ;;Recodes are often based on logic that checks the consistency and accuracy of the data. In general it is a good idea to use recodes when they are available, unless there is a compelling reason
 ;;to process the raw data yourself.
+;;
+;;## 1.6 Transformation
+;;
+;;When you import data like this, you often have to check for errors, deal with special values, convert data into different formats, and perform calculations. These operations
+;;are called **data cleaning**.
+;;
+;;`nsfg.clj` includes `clean-fem-preg`, a function that cleans the variables I am planning to use.
+;;
+;;```
+;; (defn clean-fem-preg
+;;   [ds]
+;;   (-> ds
+;;       (tc/map-columns :agepreg                    ; target column name (new or to be updated)
+;;                       [:agepreg]                  ; selected columns which values will be passed to the mapping function
+;;                       (fn [v]                     ; mapping function (its arity must match the number of selected
+;;                         (when-not (nil? v)        ; columns) which results to the new/updated value of the target column
+;;                           (float (/ v 100)))))
+;;       (tc/map-columns :birthwgt-lb
+;;                       [:birthwgt-lb]
+;;                       (fn [v]
+;;                         (let [na-vals [51 97 98 99]] ; there is at least one bogus value (51) that needs to be addressed as well
+;;                           (if (in? na-vals v) nil v))))
+;;       (tc/map-columns :birthwgt-oz
+;;                       [:birthwgt-oz]
+;;                       (fn [v]
+;;                         (let [na-vals [97 98 99]] ; address special codes [97 98 99]
+;;                           (if (in? na-vals v) nil v))))
+;;       (tc/map-columns :totalwgt-lb
+;;                       [:birthwgt-lb :birthwgt-oz]
+;;                       (fn [w-lb w-oz]
+;;                         (when (and w-lb w-oz)
+;;                           (-> (/ w-oz 16)
+;;                               float
+;;                               (+ w-lb)))))))
+;;```
+;;`agepreg` contains the mother’s age at the end of the pregnancy. In the data file, `agepreg` is encoded as an integer number of centiyears. So the first `map-columns` divides each element
+;;of `agepreg` by 100, yielding a floating-point value in years.
+;;
+;;`map-columns` is used to create or update existing columns in the dataset. The first argument is the dataset, the second one
+;;is the target column name (new or to be updated), the third argument is the sequence of columns which values will be passed to the mapping function, the forth argument is the mapping function
+;;(its arity must match the number of selected columns) which results to the new/updated value of the target column.
+;;
+;;`birthwgt_lb` and `birthwgt_oz` contain the weight of the baby, in pounds and ounces, for pregnancies that end in live birth. In addition it uses several special codes:
+;;```
+;;97 NOT ASCERTAINED
+;;98 REFUSED
+;;99 DON'T KNOW
+;;```
+;;
+;;Special values encoded as numbers are *dangerous* because if they are not handled properly, they can generate bogus results, like a 99-pound baby.
+;;Here we replacing these values with `nil` to skip them in the further calculations.
+;;
+;;The last of `map-columns` creates a new column `totalwgt_lb` that combines pounds and ounces into a single quantity, in pounds.
 ;;
