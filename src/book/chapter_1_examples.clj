@@ -235,3 +235,63 @@
 ;;
 ;;The last of `map-columns` creates a new column `totalwgt_lb` that combines pounds and ounces into a single quantity, in pounds.
 ;;
+;;## 1.7 Validation
+;;
+;;When data is exported from one software environment and imported into another, errors might be introduced. And when you are getting familiar with a new dataset, you might interpret data
+;;incorrectly or introduce other misunderstandings. If you take time to validate the data, you can save time later and avoid errors.
+;;
+;;One way to validate data is to compute basic statistics and compare them with published results. For example, the NSFG codebook includes tables that summarize each variable. Here is the
+;;table for `outcome`, which encodes the outcome of each pregnancy:
+;;
+;;```
+;; value   label                  Total
+;; 1       LIVE BIRTH              9148
+;; 2       INDUCED ABORTION        1862
+;; 3       STILLBIRTH               120
+;; 4       MISCARRIAGE             1921
+;; 5       ECTOPIC PREGNANCY        190
+;; 6       CURRENT PREGNANCY        352
+;;```
+;;
+;;We can use `frequencies` function to count the number of times each value appears. If we select the `outcome` column from the DataFrame, we can use `frequencies` to compare with the
+;;published data:
+;;
+(->> (:outcome (nsfg/read-fem-preg-dataset))
+     (frequencies)
+     (sort-by first))
+;;
+;;The result of `frequencies` is a map where keys are values and we can sort by it using `(sort-by first)`, so the values appear in order.
+;;
+;;Comparing the results with the published table, it looks like the values in `outcome` are correct. Similarly, here is the published table for `birthwgt_lb`
+;;
+;;```
+;; value   label                  Total
+;; .       INAPPLICABLE            4449
+;; 0-5     UNDER 6 POUNDS          1125
+;; 6       6 POUNDS                2223
+;; 7       7 POUNDS                3049
+;; 8       8 POUNDS                1889
+;; 9-95    9 POUNDS OR MORE         799
+;;```
+;;
+;;And here are the frequencies:
+;;
+(->> (:birthwgt-lb (nsfg/read-fem-preg-dataset))
+     (frequencies)
+     (sort-by first))
+;;
+;;The counts for 6, 7, and 8 pounds check out, and if you add up the counts for 0-5 and 9-95, they check out, too. But if you look more closely, you will notice one value that has to be
+;;an error, a 51 pound baby!
+;;
+;;To deal with this error, I added the following logic to `clean-fem-preg`:
+;;```
+;; (tc/map-columns :birthwgt-lb
+;;                 [:birthwgt-lb]
+;;                 (fn [v]
+;;                   (let [na-vals [51 97 98 99]]    ; here if the value is 51 or 97, 98, 99 then it is replaced by nil
+;;                     (if (in? na-vals v) nil v))))
+;;```
+;;This statement replaces invalid values with `nil`.
+;;
+;;
+;;
