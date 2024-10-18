@@ -233,7 +233,7 @@
 ;;Special values encoded as numbers are *dangerous* because if they are not handled properly, they can generate bogus results, like a 99-pound baby.
 ;;Here we replacing these values with `nil` to skip them in the further calculations.
 ;;
-;;The last of `map-columns` creates a new column `totalwgt_lb` that combines pounds and ounces into a single quantity, in pounds.
+;;The last of `map-columns` creates a new column `totalwgt-lb` that combines pounds and ounces into a single quantity, in pounds.
 ;;
 ;;## 1.7 Validation
 ;;
@@ -293,5 +293,31 @@
 ;;```
 ;;This statement replaces invalid values with `nil`.
 ;;
+;;## 1.8 Interpretation
 ;;
+;;To work with data effectively, you have to think on two levels at the same time: the level of statistics and the level of context.
+;;
+;;As an example, let’s look at the sequence of outcomes for a few respondents. Because of the way the data files are organized, we have to do some processing to collect the pregnancy data
+;;for each respondent. Here’s a function that does that:
+;;
+;;```
+;; (defn make-preg-map [caseid]
+;;   (-> (read-fem-preg-dataset)                        ; load dataset
+;;       (tc/select-columns [:caseid :outcome])         ; select only caseid and outcome columns
+;;       (tc/select-rows (comp #(= caseid %) :caseid))  ; select only rows with needed caseid
+;;       :outcome))
+;;```
+;;
+;;This example looks up one respondent and prints a list of outcomes for her pregnancies:
+(nsfg/make-preg-map 10229)
+;;
+;;The outcome code `1` indicates a live birth. Code `4` indicates a miscarriage; that is, a pregnancy that ended spontaneously, usually with no known medical cause.
+;;
+;;Statistically this respondent is not unusual. Miscarriages are common and there are other respondents who reported as many or more.
+;;
+;;But remembering the context, this data tells the story of a woman who was pregnant six times, each time ending in miscarriage. Her seventh and most recent pregnancy ended in a live birth.
+;;If we consider this data with empathy, it is natural to be moved by the story it tells.
+;;
+;;Each record in the NSFG dataset represents a person who provided honest answers to many personal and difficult questions. We can use this data to answer statistical questions about family
+;;life, reproduction, and health. At the same time, we have an obligation to consider the people represented by the data, and to afford them respect and gratitude.
 ;;
