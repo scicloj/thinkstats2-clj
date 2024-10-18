@@ -169,3 +169,10 @@
 
       (catch AssertionError e "Assert data failed" (.getMessage e)))
     (prn "All tests passed.")))
+
+(defn make-preg-map [caseid]
+  (let [caseid (str caseid)]
+    (-> (read-fem-preg-dataset)
+        (tc/select-columns [:caseid :outcome])
+        (tc/select-rows (comp #(= caseid %) :caseid))
+        :outcome)))
